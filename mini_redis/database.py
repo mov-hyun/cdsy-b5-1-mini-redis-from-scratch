@@ -2,6 +2,8 @@
 
 from .hash_map import HashMap
 from .linked_list import DoublyLinkedList
+from .min_heap import MinHeap
+from time import monotonic_ns
 
 
 class MiniRedis:
@@ -20,8 +22,13 @@ class MiniRedis:
         "TTL",
     )
 
-    def __init__(self):
+    def __init__(self, clock=monotonic_ns):
         self.storage = HashMap()
+        self.clock = clock
+        self.expirations = HashMap()
+        self.expiry_heap = MinHeap()
+        self.expiry_version = 0
+        self.now = 0
         self.lru = DoublyLinkedList()
         self.lru_nodes = HashMap()
         self.used_memory = 0
@@ -47,6 +54,8 @@ class MiniRedis:
             ("KEYS", 1, self._keys),
             ("CONFIG", 4, self._config),
             ("INFO", 2, self._info),
+            ("EXPIRE", 3, self._expire),
+            ("TTL", 2, self._ttl),
         ):
             if command == name:
                 if len(arguments) != arity:
@@ -54,6 +63,8 @@ class MiniRedis:
                         "(error) ERR wrong number of arguments for '{}' command"
                         .format(command)
                     ]
+                self.now = self.clock()
+                self._purge_expired()
                 return handler(arguments)
 
         return ["(error) ERR command '{}' is not implemented yet".format(command)]
@@ -65,6 +76,7 @@ class MiniRedis:
         if self.maxmemory > 0 and new_size > self.maxmemory:
             return ["(error) OOM command not allowed when used_memory > 'maxmemory'"]
         old_value = self.storage.put(key, value)
+        self.expirations.remove(key)
         if old_value is not None:
             self.used_memory -= self._entry_size(key, old_value)
         self.used_memory += new_size
@@ -105,7 +117,52 @@ class MiniRedis:
             return False
         self.used_memory -= self._entry_size(key, value)
         self.lru.remove_node(self.lru_nodes.remove(key))
+        self.expirations.remove(key)
         return True
+
+    def _purge_expired(self):
+        """Discard stale records and delete due keys before command execution."""
+        while self.expiry_heap.size():
+            deadline, key, version = self.expiry_heap.peek()
+            if self.expirations.get(key) != (deadline, version):
+                self.expiry_heap.pop()
+                continue
+            if deadline > self.now:
+                break
+            self.expiry_heap.pop()
+            self._remove_key(key)
+
+    def _expire(self, arguments):
+        """Schedule an integer-second deadline without refreshing LRU."""
+        raw = arguments[2]
+        digits = raw[1:] if raw.startswith(('+', '-')) else raw
+        if not digits or any(c < '0' or c > '9' for c in digits):
+            return ['(error) ERR value is not an integer or out of range']
+        try:
+            seconds = int(raw)
+        except ValueError:
+            return ['(error) ERR value is not an integer or out of range']
+        key = arguments[1]
+        if not self.storage.contains(key):
+            return ['(integer) 0']
+        if seconds <= 0:
+            self._remove_key(key)
+        else:
+            self.expiry_version += 1
+            deadline = self.now + seconds * 1_000_000_000
+            self.expirations.put(key, (deadline, self.expiry_version))
+            self.expiry_heap.push((deadline, key, self.expiry_version))
+        return ['(integer) 1']
+
+    def _ttl(self, arguments):
+        """Return whole remaining seconds, -1 for persistent, or -2 for absent."""
+        key = arguments[1]
+        if not self.storage.contains(key):
+            return ['(integer) -2']
+        expiration = self.expirations.get(key)
+        if expiration is None:
+            return ['(integer) -1']
+        return ['(integer) {}'.format((expiration[0] - self.now) // 1_000_000_000)]
 
     def _config(self, arguments):
         """Set a nonnegative byte limit; enforce it on the next successful SET."""

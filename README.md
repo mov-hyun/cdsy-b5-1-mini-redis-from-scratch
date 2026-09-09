@@ -2,7 +2,7 @@
 
 Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조를 직접 구현하는 CLI 기반 Mini Redis 프로젝트입니다.
 
-> 현재 상태: 자료구조 3종, 기본 명령 6개, LRU 추적과 메모리 관리 명령을 구현했습니다. TTL 만료 처리는 다음 단계에서 연결합니다.
+> 현재 상태: 자료구조 3종과 필수 명령 10개, LRU·메모리 관리·TTL 연동을 구현했습니다. 최종 CLI 통합 검증과 제출 문서 정리가 남아 있습니다.
 
 ## 목표
 
@@ -18,7 +18,7 @@ Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조�
 | --- | --- |
 | String | `SET`, `GET`, `DEL`, `EXISTS`, `DBSIZE`, `KEYS` |
 | Memory | `CONFIG SET maxmemory`, `INFO memory` |
-| TTL (구현 예정) | `EXPIRE`, `TTL` |
+| TTL | `EXPIRE`, `TTL` |
 | CLI | `exit`, `quit` |
 
 ## 실행 환경
@@ -90,7 +90,7 @@ python -m unittest discover -s tests -v
 3. [완료] 최소 힙과 단위 테스트
 4. [완료] 기본 String 명령 (LRU·TTL 연동은 5~6단계)
 5. [완료] 메모리 제한과 LRU 퇴출
-6. TTL과 lazy deletion
+6. [완료] TTL과 lazy deletion
 7. CLI 오류 처리와 통합 테스트
 
 ## 메모리와 LRU 동작
@@ -104,3 +104,19 @@ python -m unittest discover -s tests -v
 키와 값의 UTF-8 바이트 합이 단독으로 제한을 초과하면 OOM을 반환하며 기존 값과
 LRU 순서를 유지합니다. 그 외에는 저장 후 가장 오래 사용하지 않은 키부터 제거합니다.
 `evicted_keys`는 LRU 퇴출만 누적하며 명시적 DEL은 포함하지 않습니다.
+
+## TTL 동작
+
+`EXPIRE key seconds`는 초 단위 만료를 지정하고, 0 이하는 즉시 삭제합니다.
+`TTL`은 남은 초를 내림하여 반환합니다. 영구 키는 -1, 없는 키는 -2입니다.
+시스템 시각 변경의 영향을 피하도록 단조 시계의 정수 나노초를 사용합니다.
+
+최소 힙에는 `(만료시각, 키, 버전)`을 저장합니다. 자체 해시맵의 현재 버전과
+다른 힙 항목은 lazy deletion으로 무시합니다. DEL·퇴출·SET 덮어쓰기는 TTL
+메타데이터를 즉시 제거하며, 무효 힙 항목은 힙 맨 위에 도달했을 때 정리합니다.
+따라서 긴 만료를 반복 설정하면 무효 항목이 일시적으로 남을 수 있습니다.
+
+각 정상 인자 개수의 명령 실행 전에 만료 키를 정리하므로 GET뿐 아니라
+KEYS·DBSIZE·INFO에도 만료가 반영됩니다. 입력 대기 중에는 백그라운드 삭제를
+수행하지 않습니다. 만료 삭제는 LRU를 갱신하거나 퇴출 횟수를 증가시키지 않습니다.
+성공한 SET 덮어쓰기는 TTL을 초기화하며 OOM으로 거절된 SET은 기존 TTL을 유지합니다.
