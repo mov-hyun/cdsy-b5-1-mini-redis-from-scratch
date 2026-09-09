@@ -2,7 +2,7 @@
 
 Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조를 직접 구현하는 CLI 기반 Mini Redis 프로젝트입니다.
 
-> 현재 상태: 이중 연결 리스트, 체이닝 해시맵, 최소 힙 구현을 완료했습니다. Redis 명령은 이후 단계에서 구현합니다.
+> 현재 상태: 자료구조 3종과 기본 String 명령 6개를 구현했습니다. LRU 추적·메모리 제한과 TTL 만료 처리는 다음 단계에서 연결합니다.
 
 ## 목표
 
@@ -12,13 +12,13 @@ Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조�
 - 메모리 제한과 LRU 자동 퇴출 구현
 - Redis 스타일 CLI와 오류 메시지 제공
 
-## 지원 예정 명령어
+## 명령어
 
 | 분류 | 명령어 |
 | --- | --- |
 | String | `SET`, `GET`, `DEL`, `EXISTS`, `DBSIZE`, `KEYS` |
-| Memory | `CONFIG SET maxmemory`, `INFO memory` |
-| TTL | `EXPIRE`, `TTL` |
+| Memory (구현 예정) | `CONFIG SET maxmemory`, `INFO memory` |
+| TTL (구현 예정) | `EXPIRE`, `TTL` |
 | CLI | `exit`, `quit` |
 
 ## 실행 환경
@@ -31,6 +31,20 @@ python main.py
 ```
 
 종료하려면 `exit` 또는 `quit`을 입력합니다.
+
+```text
+mini-redis> SET name "Alice Smith"
+OK
+mini-redis> GET name
+"Alice Smith"
+mini-redis> DEL name
+(integer) 1
+mini-redis> GET name
+(nil)
+```
+
+명령어는 대소문자를 구분하지 않으며 키는 구분합니다. 큰따옴표로 공백이
+포함된 값과 빈 문자열을 입력할 수 있습니다. `KEYS`는 패턴 인자를 받지 않습니다.
 
 ## 테스트
 
@@ -50,6 +64,10 @@ python -m unittest discover -s tests -v
 |   |-- linked_list.py
 |   `-- min_heap.py
 |-- tests/
+|   |-- test_database.py
+|   |-- test_hash_map.py
+|   |-- test_linked_list.py
+|   |-- test_min_heap.py
 |   `-- test_project_structure.py
 |-- main.py
 |-- requirements.txt
@@ -70,7 +88,7 @@ python -m unittest discover -s tests -v
 1. [완료] 이중 연결 리스트와 단위 테스트
 2. [완료] 체이닝 해시맵, 리사이징과 단위 테스트
 3. [완료] 최소 힙과 단위 테스트
-4. 기본 String 명령
+4. [완료] 기본 String 명령 (LRU·TTL 연동은 5~6단계)
 5. 메모리 제한과 LRU 퇴출
 6. TTL과 lazy deletion
 7. CLI 오류 처리와 통합 테스트
