@@ -2,7 +2,7 @@
 
 Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조를 직접 구현하는 CLI 기반 Mini Redis 프로젝트입니다.
 
-> 현재 상태: 자료구조 3종과 기본 String 명령 6개를 구현했습니다. LRU 추적·메모리 제한과 TTL 만료 처리는 다음 단계에서 연결합니다.
+> 현재 상태: 자료구조 3종, 기본 명령 6개, LRU 추적과 메모리 관리 명령을 구현했습니다. TTL 만료 처리는 다음 단계에서 연결합니다.
 
 ## 목표
 
@@ -17,7 +17,7 @@ Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조�
 | 분류 | 명령어 |
 | --- | --- |
 | String | `SET`, `GET`, `DEL`, `EXISTS`, `DBSIZE`, `KEYS` |
-| Memory (구현 예정) | `CONFIG SET maxmemory`, `INFO memory` |
+| Memory | `CONFIG SET maxmemory`, `INFO memory` |
 | TTL (구현 예정) | `EXPIRE`, `TTL` |
 | CLI | `exit`, `quit` |
 
@@ -89,6 +89,18 @@ python -m unittest discover -s tests -v
 2. [완료] 체이닝 해시맵, 리사이징과 단위 테스트
 3. [완료] 최소 힙과 단위 테스트
 4. [완료] 기본 String 명령 (LRU·TTL 연동은 5~6단계)
-5. 메모리 제한과 LRU 퇴출
+5. [완료] 메모리 제한과 LRU 퇴출
 6. TTL과 lazy deletion
 7. CLI 오류 처리와 통합 테스트
+
+## 메모리와 LRU 동작
+
+성공한 `SET`과 `GET`은 키를 LRU 목록 맨 앞으로 이동합니다.
+`EXISTS`, `KEYS`, `DBSIZE`, `INFO`와 실패한 조회는 순서를 바꾸지 않습니다.
+자체 해시맵으로 노드를 평균 O(1)에 찾고, 연결 리스트에서 O(1)에 이동합니다.
+
+메모리 제한 기본값과 `0`은 무제한입니다. `CONFIG SET maxmemory`로 제한을
+낮춘 경우 과제의 SET 이후 퇴출 규칙에 따라 다음 성공한 SET에서 제한을 적용합니다.
+키와 값의 UTF-8 바이트 합이 단독으로 제한을 초과하면 OOM을 반환하며 기존 값과
+LRU 순서를 유지합니다. 그 외에는 저장 후 가장 오래 사용하지 않은 키부터 제거합니다.
+`evicted_keys`는 LRU 퇴출만 누적하며 명시적 DEL은 포함하지 않습니다.
