@@ -1,11 +1,13 @@
 """Minimum heap used to find the earliest TTL expiration."""
 
+from .dynamic_array import DynamicArray
+
 
 class MinHeap:
     """A custom array-backed minimum heap for comparable items."""
 
     def __init__(self):
-        self.items = []
+        self.items = DynamicArray()
 
     def push(self, item):
         """Insert an item while maintaining the heap property."""
@@ -14,13 +16,13 @@ class MinHeap:
 
     def pop(self):
         """Remove and return the minimum item, or None when empty."""
-        if not self.items:
+        if len(self.items) == 0:
             return None
 
         minimum = self.items[0]
         last_item = self.items.pop()
 
-        if self.items:
+        if len(self.items):
             self.items[0] = last_item
             self._heapify_down(0)
 
@@ -28,7 +30,7 @@ class MinHeap:
 
     def peek(self):
         """Return the minimum item without removing it."""
-        if not self.items:
+        if len(self.items) == 0:
             return None
         return self.items[0]
 
