@@ -2,11 +2,12 @@
 
 Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조를 직접 구현하는 CLI 기반 Mini Redis 프로젝트입니다.
 
-> 현재 상태: 필수 기능 구현과 최종 통합 검증을 완료했습니다. 테스트 52개가 통과했으며 실행 예시와 설계 설명을 함께 제공합니다.
+> 현재 상태: 필수 기능과 보너스 과제 5개를 모두 구현했습니다. 테스트 63개가 통과했으며 실행 예시와 설계 설명을 함께 제공합니다.
 
 - [구조와 설계 이유](docs/DESIGN.md)
 - [실행 예시와 재현 방법](docs/DEMO.md)
 - [검증 결과와 요구사항 대응](docs/VALIDATION.md)
+- [스택·큐·덱 정리 (보너스 2)](docs/STACK_QUEUE_DEQUE.md)
 
 ## 목표
 
@@ -23,6 +24,7 @@ Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조�
 | String | `SET`, `GET`, `DEL`, `EXISTS`, `DBSIZE`, `KEYS` |
 | Memory | `CONFIG SET maxmemory`, `INFO memory` |
 | TTL | `EXPIRE`, `TTL` |
+| Pub/Sub (보너스) | `PUBLISH`, `SUBSCRIBE` |
 | CLI | `exit`, `quit` |
 
 ## 실행 환경
@@ -62,12 +64,17 @@ python -m unittest discover -s tests -v
 .
 |-- mini_redis/
 |   |-- __init__.py
+|   |-- binary_tree.py      # 보너스 3
+|   |-- bst.py              # 보너스 4
 |   |-- cli.py
 |   |-- database.py
+|   |-- dynamic_array.py    # 보너스 1
 |   |-- hash_map.py
 |   |-- linked_list.py
-|   `-- min_heap.py
+|   |-- min_heap.py
+|   `-- pubsub.py           # 보너스 5
 |-- tests/
+|   |-- test_bonus.py
 |   |-- test_database.py
 |   |-- test_hash_map.py
 |   |-- test_integration.py
@@ -79,6 +86,7 @@ python -m unittest discover -s tests -v
 |-- docs/
 |   |-- DESIGN.md
 |   |-- DEMO.md
+|   |-- STACK_QUEUE_DEQUE.md
 |   `-- VALIDATION.md
 |-- main.py
 |-- requirements.txt
@@ -103,6 +111,7 @@ python -m unittest discover -s tests -v
 5. [완료] 메모리 제한과 LRU 퇴출
 6. [완료] TTL과 lazy deletion
 7. [완료] CLI 오류 처리와 통합 테스트, 제출 문서 정리
+8. [완료] 보너스 과제 1~5
 
 ## 메모리와 LRU 동작
 
@@ -131,3 +140,29 @@ LRU 순서를 유지합니다. 그 외에는 저장 후 가장 오래 사용하�
 KEYS·DBSIZE·INFO에도 만료가 반영됩니다. 입력 대기 중에는 백그라운드 삭제를
 수행하지 않습니다. 만료 삭제는 LRU를 갱신하거나 퇴출 횟수를 증가시키지 않습니다.
 성공한 SET 덮어쓰기는 TTL을 초기화하며 OOM으로 거절된 SET은 기존 TTL을 유지합니다.
+
+## 보너스 과제
+
+| 번호 | 내용 | 구현 |
+| --- | --- | --- |
+| 1 | 동적 배열: append/get/set/remove, 용량 2배 확장 | `dynamic_array.py`, 최소 힙의 내부 저장소로 사용 |
+| 2 | 스택·큐·덱 조사 | [docs/STACK_QUEUE_DEQUE.md](docs/STACK_QUEUE_DEQUE.md) |
+| 3 | 이진 트리와 전위·중위·후위·레벨 순회 | `binary_tree.py`, `from_array`로 힙 배열을 트리로 복원 |
+| 4 | BST 삽입·탐색·삭제, 중위 순회 정렬 | `bst.py` |
+| 5 | `PUBLISH`, `SUBSCRIBE` | `pubsub.py`, 구독자별 메시지 큐로 연결 리스트 재사용 |
+
+CLI는 단일 세션이므로 `SUBSCRIBE`는 현재 세션을 구독자로 등록하고, 이후 `PUBLISH`가
+그 채널로 보낸 메시지를 결과 뒤에 이어서 출력합니다. 실제 Redis처럼 구독 상태에서
+다른 명령을 막지는 않습니다.
+
+```text
+mini-redis> SUBSCRIBE news
+1) "subscribe"
+2) "news"
+3) (integer) 1
+mini-redis> PUBLISH news "hello world"
+(integer) 1
+1) "message"
+2) "news"
+3) "hello world"
+```

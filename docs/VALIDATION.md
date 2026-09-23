@@ -4,7 +4,7 @@
 
 ```text
 python -m unittest discover -s tests -q
-Ran 52 tests
+Ran 63 tests
 OK
 ```
 
@@ -20,6 +20,11 @@ Python 3.8 문법은 AST 파서로 검사했으며, Python 3.8 런타임 자체�
 | UTF-8 메모리·OOM·LRU·통계 | database.py | test_memory.py |
 | TTL·즉시 만료·덮어쓰기·재생성 | database.py | test_ttl.py |
 | 실제 CLI와 오류 복구 | main.py | test_integration.py |
+| 보너스 1 동적 배열·2배 확장·힙 저장소 적용 | dynamic_array.py, min_heap.py | test_bonus.py |
+| 보너스 2 스택·큐·덱 문서 | docs/STACK_QUEUE_DEQUE.md | 문서 |
+| 보너스 3 이진 트리 4종 순회 | binary_tree.py | test_bonus.py |
+| 보너스 4 BST 삽입·탐색·삭제·정렬 | bst.py | test_bonus.py (무작위 300회 비교 포함) |
+| 보너스 5 PUBLISH·SUBSCRIBE | pubsub.py, database.py | test_bonus.py |
 | dict/set/collections 미사용 | mini_redis 전체 | AST 검사 및 코드 검토 |
 
 통합 검증은 500회 혼합 명령 후 메모리 재계산 값, 저장소와 LRU 키 집합,
@@ -33,7 +38,7 @@ EOF와 KeyboardInterrupt 종료도 별도 확인했다.
 - TTL은 남은 초를 내림하며 만료 경계에서는 없는 키로 처리한다.
 - 만료는 명령 실행 전에 정리하고 백그라운드 스레드는 사용하지 않는다.
 - DEL과 퇴출은 TTL 메타데이터를 즉시 제거하며 무효 힙 기록은 나중에 버린다.
-- 선택 보너스는 제출 범위에 포함하지 않는다.
+- 보너스 5개를 모두 구현했다. Pub/Sub은 단일 CLI 세션을 구독자로 사용한다.
 
 이 문서는 원래 Mini Redis 과제 설명에 대응한다. 성능 벤치마크 수치는 측정하지 않았으며
 시간복잡도 설명은 코드의 자료구조와 연산 과정을 근거로 한다.
