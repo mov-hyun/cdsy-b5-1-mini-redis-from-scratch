@@ -3,24 +3,12 @@
 from .hash_map import HashMap
 from .linked_list import DoublyLinkedList
 from .min_heap import MinHeap
+from .pubsub import PubSub, Subscriber
 from time import monotonic_ns
 
 
 class MiniRedis:
     """Coordinate storage, LRU eviction, TTL expiration, and statistics."""
-
-    KNOWN_COMMANDS = (
-        "SET",
-        "GET",
-        "DEL",
-        "EXISTS",
-        "DBSIZE",
-        "KEYS",
-        "CONFIG",
-        "INFO",
-        "EXPIRE",
-        "TTL",
-    )
 
     def __init__(self, clock=monotonic_ns):
         self.storage = HashMap()
@@ -34,6 +22,9 @@ class MiniRedis:
         self.used_memory = 0
         self.maxmemory = 0
         self.evicted_keys = 0
+        self.pubsub = PubSub()
+        # The REPL session is the single client that SUBSCRIBE registers.
+        self.client = Subscriber()
 
     def execute(self, arguments):
         """Execute parsed CLI arguments and return display lines."""
@@ -41,10 +32,9 @@ class MiniRedis:
             return []
 
         command = arguments[0].upper()
-        if command not in self.KNOWN_COMMANDS:
-            return ["(error) ERR unknown command '{}'".format(arguments[0])]
 
         # A tuple table keeps dispatch independent of built-in mappings.
+        # Negative arity means "at least" that many arguments, as in Redis.
         for name, arity, handler in (
             ("SET", 3, self._set),
             ("GET", 2, self._get),
@@ -56,9 +46,12 @@ class MiniRedis:
             ("INFO", 2, self._info),
             ("EXPIRE", 3, self._expire),
             ("TTL", 2, self._ttl),
+            ("PUBLISH", 3, self._publish),
+            ("SUBSCRIBE", -2, self._subscribe),
         ):
             if command == name:
-                if len(arguments) != arity:
+                if (len(arguments) != arity if arity > 0
+                        else len(arguments) < -arity):
                     return [
                         "(error) ERR wrong number of arguments for '{}' command"
                         .format(command)
@@ -67,7 +60,7 @@ class MiniRedis:
                 self._purge_expired()
                 return handler(arguments)
 
-        return ["(error) ERR command '{}' is not implemented yet".format(command)]
+        return ["(error) ERR unknown command '{}'".format(arguments[0])]
 
     def _set(self, arguments):
         """Store a string, replacing the previous value when present."""
@@ -210,3 +203,21 @@ class MiniRedis:
         escaped = escaped.replace("\n", "\\n").replace("\r", "\\r")
         escaped = escaped.replace("\t", "\\t")
         return '"{}"'.format(escaped)
+
+    def _subscribe(self, arguments):
+        """Subscribe this session to each channel, Redis reply per channel."""
+        lines = []
+        for channel in arguments[1:]:
+            count = self.pubsub.subscribe(channel, self.client)
+            lines += ['1) "subscribe"', '2) {}'.format(self._quote(channel)),
+                      '3) (integer) {}'.format(count)]
+        return lines
+
+    def _publish(self, arguments):
+        """Deliver to subscribers, then show messages queued for this session."""
+        receivers = self.pubsub.publish(arguments[1], arguments[2])
+        lines = ['(integer) {}'.format(receivers)]
+        for channel, message in self.client.drain():
+            lines += ['1) "message"', '2) {}'.format(self._quote(channel)),
+                      '3) {}'.format(self._quote(message))]
+        return lines
