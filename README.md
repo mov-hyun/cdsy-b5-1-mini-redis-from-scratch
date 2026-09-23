@@ -8,6 +8,7 @@ Python의 내장 Key-Value 컬렉션에 의존하지 않고 핵심 자료구조�
 - [실행 예시와 재현 방법](docs/DEMO.md)
 - [검증 결과와 요구사항 대응](docs/VALIDATION.md)
 - [스택·큐·덱 정리 (보너스 2)](docs/STACK_QUEUE_DEQUE.md)
+- [확장 논의: LFU 전환·대규모 병목·used_memory 모델](docs/DISCUSSION.md)
 
 ## 목표
 
@@ -86,6 +87,7 @@ python -m unittest discover -s tests -v
 |-- docs/
 |   |-- DESIGN.md
 |   |-- DEMO.md
+|   |-- DISCUSSION.md
 |   |-- STACK_QUEUE_DEQUE.md
 |   `-- VALIDATION.md
 |-- main.py
